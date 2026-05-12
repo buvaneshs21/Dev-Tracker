@@ -4,42 +4,49 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-export default function LoginPage() {
+export default function Signup() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(form),
       });
 
       const data = await res
         .json()
-        .catch(() => ({}) as { error?: string; token?: string });
+        .catch(() => ({}) as { error?: string });
 
-      if (!res.ok) {
+      if (res.ok) {
+        router.push("/login");
+      } else {
         setError(
-          data.error || `Login failed (${res.status}). Check the server logs.`,
+          data.error ||
+            `Signup failed (${res.status}). Check the server logs.`,
         );
         setLoading(false);
-        return;
       }
-
-      if (data.token) localStorage.setItem("token", data.token);
-      router.push("/dashboard");
     } catch (err) {
       console.error(err);
-      setError("Something went wrong. Please try again.");
+      setError("Error occurred. Please try again.");
       setLoading(false);
     }
   };
@@ -47,8 +54,8 @@ export default function LoginPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0a0a0f] text-white">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full bg-indigo-600/30 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 h-[520px] w-[520px] rounded-full bg-violet-600/30 blur-3xl" />
+        <div className="absolute -top-40 -right-40 h-[480px] w-[480px] rounded-full bg-violet-600/30 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-[520px] w-[520px] rounded-full bg-fuchsia-600/25 blur-3xl" />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
@@ -66,20 +73,35 @@ export default function LoginPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-tight">
-                Welcome back
+                Create your account
               </h1>
-              <p className="text-sm text-white/55">Sign in to continue</p>
+              <p className="text-sm text-white/55">
+                Start tracking in under a minute
+              </p>
             </div>
           </div>
 
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+          <form onSubmit={handleSignup} className="flex flex-col gap-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-white/70">Name</span>
+              <input
+                name="name"
+                required
+                value={form.name}
+                onChange={handleChange}
+                placeholder="Ada Lovelace"
+                className="rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-indigo-400/60 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20"
+              />
+            </label>
+
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-white/70">Email</span>
               <input
+                name="email"
                 type="email"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={form.email}
+                onChange={handleChange}
                 placeholder="you@example.com"
                 className="rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-indigo-400/60 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20"
               />
@@ -90,11 +112,13 @@ export default function LoginPage() {
                 Password
               </span>
               <input
+                name="password"
                 type="password"
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                minLength={6}
+                value={form.password}
+                onChange={handleChange}
+                placeholder="At least 6 characters"
                 className="rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-indigo-400/60 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20"
               />
             </label>
@@ -110,17 +134,17 @@ export default function LoginPage() {
               disabled={loading}
               className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? "Creating account…" : "Create account"}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-white/55">
-            Don&apos;t have an account?{" "}
+            Already have an account?{" "}
             <Link
-              href="/signup"
+              href="/login"
               className="font-medium text-indigo-300 transition hover:text-indigo-200"
             >
-              Create one
+              Sign in
             </Link>
           </p>
         </div>
