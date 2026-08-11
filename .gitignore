@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# uploaded attachments (local storage driver)
+/storage
+
+# stray screenshots dropped in the project root (one held a live DB password)
+/*.png
+/*.jpg
