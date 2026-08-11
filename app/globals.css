@@ -1,1 +1,105 @@
 @import "tailwindcss";
+
+/* Dark mode is driven by data-theme on <html>, set before paint by the inline
+   script in the root layout. Tailwind v4 needs the variant declared explicitly;
+   without this, every `dark:` class compiles to nothing. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Tells the browser to render native controls — date pickers, selects,
+   scrollbars — to match. Without it those stay light on a dark page.
+
+   Chart colours live here as custom properties because SVG fills can't use
+   Tailwind's dark: variant. Both sets were run through the palette validator
+   against their own surface — light on #ffffff, dark on #0f172a — so the dark
+   steps are chosen for the dark band, not brightened versions of the light
+   ones. */
+:root {
+  color-scheme: light;
+
+  --chart-grid: #e2e8f0;
+  --chart-axis: #94a3b8;
+  --chart-tooltip-bg: #0f172a;
+  --chart-tooltip-fg: #ffffff;
+  --chart-surface: #ffffff;
+  --chart-series: #4f46e5;
+  --chart-series-soft: #818cf8;
+
+  /* status: worst pair ΔE 11.0 protan, 26.5 normal, all >= 3:1 */
+  --status-pending: #d97706;
+  --status-in-progress: #4f46e5;
+  --status-completed: #047857;
+
+  /* priority: "low" is a deliberate de-emphasis neutral, not a third hue */
+  --priority-high: #b91c1c;
+  --priority-medium: #ca8a04;
+  --priority-low: #64748b;
+
+  --ring-track: #e2e8f0;
+  --goal-accent: #22c55e;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --chart-grid: #1e293b;
+  --chart-axis: #64748b;
+  /* Inverted: a near-black tooltip would vanish into a dark page. */
+  --chart-tooltip-bg: #e2e8f0;
+  --chart-tooltip-fg: #0f172a;
+  --chart-surface: #0f172a;
+  --chart-series: #6366f1;
+  --chart-series-soft: #4338ca;
+
+  /* status: worst pair ΔE 8.4 protan, 19.8 normal, all >= 3:1 on #0f172a */
+  --status-pending: #c98500;
+  --status-in-progress: #6366f1;
+  --status-completed: #199e70;
+
+  /* priority: worst chromatic pair ΔE 10.7 protan, 16.0 normal */
+  --priority-high: #e66767;
+  --priority-medium: #a16207;
+  --priority-low: #94a3b8;
+
+  --ring-track: #1e293b;
+  --goal-accent: #22c55e;
+}
+
+/* Compact mode: one preference, applied globally rather than threaded through
+   every component as a prop. */
+[data-compact="true"] .card-padded {
+  padding: 1.1rem;
+}
+
+[data-compact="true"] main {
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+/* Subtle entrance for charts and panels. */
+@keyframes devtrack-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up {
+  animation: devtrack-fade-up 0.45s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
