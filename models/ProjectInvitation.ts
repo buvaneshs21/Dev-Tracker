@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 import { INVITATION_STATUSES, INVITABLE_ROLES } from "@/lib/types";
 
 const ProjectInvitationSchema = new mongoose.Schema(
@@ -54,5 +56,4 @@ const ProjectInvitationSchema = new mongoose.Schema(
 // Serves the "is there already a pending invite for this address?" check.
 ProjectInvitationSchema.index({ projectId: 1, email: 1, status: 1 });
 
-export default mongoose.models.ProjectInvitation ||
-  mongoose.model("ProjectInvitation", ProjectInvitationSchema);
+export default defineModel("ProjectInvitation", ProjectInvitationSchema);

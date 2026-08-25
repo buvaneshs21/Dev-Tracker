@@ -3,7 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, Link2, ListTodo, Loader2, Plus, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  Link2,
+  ListTodo,
+  Loader2,
+  Plus,
+  UserRound,
+  X,
+} from "lucide-react";
 
 import Card from "@/components/ui/Card";
 import Modal from "@/components/ui/Modal";
@@ -16,13 +25,16 @@ import TaskForm, {
   EMPTY_TASK_FORM,
   type TaskFormValues,
 } from "@/components/tasks/TaskForm";
-import type { TaskDTO } from "@/lib/types";
+import { useProjectTasks } from "@/components/realtime/useProjectTasks";
+import type { ProjectMemberDTO, TaskDTO } from "@/lib/types";
 
 interface ProjectTasksProps {
   projectId: string;
   initialTasks: TaskDTO[];
   /** The user's tasks that aren't in any project — candidates to pull in. */
   unassignedTasks: TaskDTO[];
+  /** Resolves each task's assigneeId to a name, without a lookup per row. */
+  members: ProjectMemberDTO[];
   /** Viewers can read the task list but not change it. */
   readOnly?: boolean;
 }
@@ -31,11 +43,19 @@ export default function ProjectTasks({
   projectId,
   initialTasks,
   unassignedTasks,
+  members,
   readOnly = false,
 }: ProjectTasksProps) {
   const router = useRouter();
 
-  const [tasks, setTasks] = useState(initialTasks);
+  const nameById = new Map(
+    members.map((member) => [member.userId, member.name]),
+  );
+
+  // Live: patched by socket events, or polled when realtime is unavailable.
+  // Local mutations below still setTasks directly — the events are idempotent,
+  // so the actor's own change arriving back over the socket is a no-op.
+  const { tasks, setTasks } = useProjectTasks(projectId, initialTasks);
   const [available, setAvailable] = useState(unassignedTasks);
   const [creating, setCreating] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -269,6 +289,18 @@ export default function ProjectTasks({
                     <StatusPill status={task.status} />
                     <PriorityBadge priority={task.priority} />
                     <DueDate value={task.dueDate} muted={done} />
+
+                    {/* Only once there's someone to distinguish from — on a
+                        solo project every row would say the same name. */}
+                    {members.length > 1 && (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <UserRound
+                          className="h-3.5 w-3.5"
+                          aria-hidden="true"
+                        />
+                        {nameById.get(task.assigneeId) ?? "Unassigned"}
+                      </span>
+                    )}
                   </div>
                 </div>
 

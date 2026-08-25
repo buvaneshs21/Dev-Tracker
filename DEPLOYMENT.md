@@ -55,6 +55,44 @@ Set these in Vercel → Project → Settings → Environment Variables.
 **Never prefix any of these with `NEXT_PUBLIC_`.** That would ship the
 credentials to the browser.
 
+## 4b. Real-time updates (optional)
+
+The app works without this — clients poll when no socket is available (every 3
+seconds for a project's task list, every 30 for the notification bell), so
+changes still appear without a refresh. Setting it up upgrades that to instant
+push.
+
+**Vercel cannot host the socket server.** Serverless functions are short-lived
+and cannot hold a WebSocket open. The relay in `realtime/` must run on an
+always-on host — Railway, Render, Fly.io or any VPS.
+
+On the realtime host, run `node --env-file=.env realtime/server.mts` with:
+
+| Variable | Notes |
+|---|---|
+| `JWT_SECRET` | **the same value as the Next app** — it verifies socket tokens |
+| `REALTIME_EMIT_SECRET` | any long random string, shared with the Next app |
+| `REALTIME_PORT` | often set by the platform |
+| `REALTIME_ALLOWED_ORIGIN` | your Vercel URL, e.g. `https://devtrack.vercel.app` |
+
+Then on Vercel:
+
+| Variable | Notes |
+|---|---|
+| `NEXT_PUBLIC_SOCKET_URL` | public URL of the realtime host (safe to expose — it's just an address) |
+| `REALTIME_URL` | same URL, used server-side to relay events |
+| `REALTIME_EMIT_SECRET` | must match the realtime host |
+
+The relay holds no database credentials and makes no authorisation decisions:
+the Next app signs the list of projects a user may join into a short-lived
+token, and the relay only checks the requested room against that list. It also
+doesn't understand the payloads it carries — the Next app POSTs `{ room,
+channel, payload }` and the relay forwards it unopened, so adding a new kind of
+live update never requires redeploying the always-on process.
+
+Two kinds of room are in use: `project:{id}`, gated by that token's list, and
+`user:{id}`, joined automatically on connect and used for notifications.
+
 ## 5. Deploy
 
 ```bash

@@ -259,6 +259,26 @@ export async function acceptInvitation(
     { $set: { status: "accepted" } },
   );
 
+  // Tell whoever sent the invitation that it landed. Imported lazily so this
+  // module keeps no static dependency on the notification layer.
+  const { getActorName, notify } = await import("./notifications");
+  const [actorName, project] = await Promise.all([
+    getActorName(userId),
+    Project.findById(projectId)
+      .select("name")
+      .lean<{ name?: string } | null>(),
+  ]);
+
+  await notify({
+    userId: String(loaded.row.invitedBy),
+    type: "MEMBER_JOINED",
+    actorId: userId,
+    actorName,
+    title: `${actorName} joined ${project?.name ?? "your project"}`,
+    body: "They accepted your invitation.",
+    projectId,
+  });
+
   return { ok: true, value: { projectId } };
 }
 

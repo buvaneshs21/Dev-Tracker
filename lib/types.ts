@@ -17,6 +17,17 @@ export type TaskDTO = {
   priority: TaskPriority;
   /** null for tasks that predate projects, or that were never assigned to one. */
   projectId: string | null;
+  /**
+   * Who the task is *for*, which is not necessarily who created it.
+   *
+   * Never null in the DTO: a task with no stored assignee resolves to its
+   * creator, which is what every task meant before assignment existed. That
+   * keeps old rows correct without a migration.
+   */
+  assigneeId: string;
+  /** Who performed the assignment. Null until someone actually hands it over. */
+  assignedById: string | null;
+  assignedAt: string | null;
   startDate: string | null;
   dueDate: string | null;
   createdAt: string;
@@ -243,6 +254,17 @@ export type TaskDetailData = {
   /** Total hours across all updates — Analytics can consume this later. */
   totalHours: number;
   assigneeName: string;
+  /** Who created the task. Always shown — it's a different question. */
+  creatorName: string;
+  /** Who performed the assignment. Null when nobody has reassigned it. */
+  assignedByName: string | null;
+  /**
+   * People the task can be handed to: the project's members.
+   *
+   * Empty for a task with no project — there's nobody to hand it to, so the
+   * sidebar renders a plain name instead of a picker.
+   */
+  assignableMembers: ProjectMemberDTO[];
   projectName: string | null;
   projectColor: ProjectColor | null;
   /** Resolved server-side from task ownership or project role. */
@@ -432,6 +454,69 @@ export type InvitationPreview = {
   status: InvitationStatus;
   expiresAt: string;
 };
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+export const NOTIFICATION_TYPES = [
+  "TASK_ASSIGNED",
+  "TASK_COMPLETED",
+  "MEMBER_JOINED",
+] as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/**
+ * Which Settings toggle silences which notification.
+ *
+ * The preferences UI has shipped for a while with nothing reading it; this is
+ * the map that finally gives those switches an effect.
+ */
+export const NOTIFICATION_PREFERENCE_FOR: Record<
+  NotificationType,
+  keyof NotificationPreferences
+> = {
+  TASK_ASSIGNED: "taskUpdates",
+  TASK_COMPLETED: "taskUpdates",
+  MEMBER_JOINED: "teamActivity",
+};
+
+/**
+ * The preference keys something actually writes today.
+ *
+ * Derived from the map above rather than listed by hand, so wiring up a new
+ * notification type automatically stops Settings from calling it dormant.
+ */
+export const LIVE_NOTIFICATION_PREFERENCES: ReadonlySet<
+  keyof NotificationPreferences
+> = new Set(Object.values(NOTIFICATION_PREFERENCE_FOR));
+
+export type NotificationDTO = {
+  id: string;
+  type: NotificationType;
+  /**
+   * Written at creation time rather than joined on read.
+   *
+   * A notification is a record of something that happened, so it has to survive
+   * the task being renamed or deleted — a join would turn it into "Unknown".
+   */
+  title: string;
+  body: string;
+  actorName: string;
+  taskId: string | null;
+  projectId: string | null;
+  read: boolean;
+  createdAt: string;
+};
+
+export type NotificationFeed = {
+  items: NotificationDTO[];
+  unread: number;
+};
+
+/** How many the bell menu holds. Older ones simply age out of the panel. */
+export const NOTIFICATION_PAGE_SIZE = 15;
 
 // ---------------------------------------------------------------------------
 // Analytics

@@ -9,6 +9,8 @@ interface DropdownProps {
   children: ReactNode;
   triggerClassName?: string;
   panelClassName?: string;
+  /** Lets a menu act on being opened — refreshing, or marking things seen. */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -21,9 +23,17 @@ export default function Dropdown({
   children,
   triggerClassName = "",
   panelClassName = "",
+  onOpenChange,
 }: DropdownProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+
+  // Called from the state updater rather than an effect, so a menu that reacts
+  // to opening isn't also told about its own initial closed state.
+  const change = (next: boolean) => {
+    setOpen(next);
+    onOpenChange?.(next);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -51,7 +61,7 @@ export default function Dropdown({
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => change(!open)}
         className={`transition-all duration-200 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:outline-none ${triggerClassName}`}
       >
         {trigger}

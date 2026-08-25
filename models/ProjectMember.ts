@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 import { PROJECT_ROLES } from "@/lib/types";
 
 const ProjectMemberSchema = new mongoose.Schema(
@@ -34,5 +36,4 @@ const ProjectMemberSchema = new mongoose.Schema(
 // in application code, so a double-accepted invitation can't create a duplicate.
 ProjectMemberSchema.index({ projectId: 1, userId: 1 }, { unique: true });
 
-export default mongoose.models.ProjectMember ||
-  mongoose.model("ProjectMember", ProjectMemberSchema);
+export default defineModel("ProjectMember", ProjectMemberSchema);

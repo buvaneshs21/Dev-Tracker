@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 import {
   DEFAULT_NOTIFICATIONS,
   THEMES,
@@ -41,5 +43,4 @@ const UserPreferencesSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-export default mongoose.models.UserPreferences ||
-  mongoose.model("UserPreferences", UserPreferencesSchema);
+export default defineModel("UserPreferences", UserPreferencesSchema);

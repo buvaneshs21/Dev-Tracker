@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 import { UPDATE_CONTENT_MAX } from "@/lib/types";
 
 const DailyUpdateSchema = new mongoose.Schema(
@@ -42,5 +44,4 @@ const DailyUpdateSchema = new mongoose.Schema(
 // The list is always "this task's updates, newest first".
 DailyUpdateSchema.index({ taskId: 1, date: -1 });
 
-export default mongoose.models.DailyUpdate ||
-  mongoose.model("DailyUpdate", DailyUpdateSchema);
+export default defineModel("DailyUpdate", DailyUpdateSchema);

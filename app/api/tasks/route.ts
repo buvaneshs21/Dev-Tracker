@@ -4,6 +4,10 @@ import { getSession } from "@/lib/session";
 import { serializeTask } from "@/lib/tasks";
 import { parseDueDate, parseStartDate } from "@/lib/dates";
 import { canCreateTask } from "@/lib/permissions";
+import { resolveAssignee, type Assignee } from "@/lib/assignment";
+import { getActorName, notify } from "@/lib/notifications";
+import { emitTaskEvent } from "@/lib/realtime/emit";
+import { toRealtimeTask } from "@/lib/realtime/events";
 import { isTaskPriority, isTaskStatus } from "@/lib/types";
 
 // The proxy gates the pages, but direct API calls bypass it — every handler
@@ -76,6 +80,19 @@ export async function POST(req: Request) {
     projectId = input.projectId;
   }
 
+  // Optional at creation: omitting it leaves assigneeId null, which resolves to
+  // the creator — the behaviour every task had before assignment existed.
+  let assignee: Assignee | null = null;
+  if (typeof input.assigneeId === "string" && input.assigneeId !== "") {
+    assignee = await resolveAssignee(projectId, session.userId, input.assigneeId);
+    if (!assignee) {
+      return Response.json(
+        { error: "That person isn't a member of this project" },
+        { status: 400 },
+      );
+    }
+  }
+
   // Fields listed explicitly so a caller can't set userId or anything else.
   const task = await Task.create({
     title,
@@ -84,11 +101,43 @@ export async function POST(req: Request) {
     status,
     priority,
     projectId,
+    assigneeId: assignee?.userId ?? null,
+    // Only when the task was handed to someone else at creation — assigning to
+    // yourself isn't a handover worth recording.
+    assignedById:
+      assignee && assignee.userId !== session.userId ? session.userId : null,
+    assignedAt:
+      assignee && assignee.userId !== session.userId ? new Date() : null,
     startDate,
     dueDate,
     completedAt: status === "completed" ? new Date() : null,
     userId: session.userId,
   });
 
-  return Response.json(serializeTask(task.toObject()), { status: 201 });
+  const created = serializeTask(task.toObject());
+
+  // Emitted only after the write succeeded, and only for tasks that belong to
+  // a project — a personal task has no room to broadcast to.
+  if (created.projectId) {
+    emitTaskEvent({ type: "TASK_CREATED", task: toRealtimeTask(created) });
+  }
+
+  // Awaited rather than dropped: a serverless function can be frozen as soon as
+  // it responds. notify() no-ops when you assigned it to yourself.
+  if (assignee) {
+    const actorName = await getActorName(session.userId);
+
+    await notify({
+      userId: assignee.userId,
+      type: "TASK_ASSIGNED",
+      actorId: session.userId,
+      actorName,
+      title: `${actorName} assigned you a task`,
+      body: created.title,
+      taskId: created.id,
+      projectId: created.projectId,
+    });
+  }
+
+  return Response.json(created, { status: 201 });
 }

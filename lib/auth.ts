@@ -28,6 +28,12 @@ export function verifyToken(token: string | undefined): Session | null {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!);
     if (typeof decoded === "string" || !decoded.userId) return null;
+
+    // Socket tokens are signed with the same secret but carry a scope claim.
+    // Without this check, a leaked realtime token would work as a session
+    // cookie — it has a userId, which is all this used to require.
+    if (decoded.scope) return null;
+
     return { userId: String(decoded.userId) };
   } catch {
     // expired, tampered with, or signed under a previous JWT_SECRET

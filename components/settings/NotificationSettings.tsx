@@ -7,6 +7,7 @@ import SettingsSection from "./SettingsSection";
 import FormFeedback, { type Feedback } from "./FormFeedback";
 import Toggle from "@/components/ui/Toggle";
 import {
+  LIVE_NOTIFICATION_PREFERENCES,
   NOTIFICATION_COPY,
   type NotificationPreferences,
 } from "@/lib/types";
@@ -56,8 +57,9 @@ export default function NotificationSettings({
       <div className="mb-6 flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-300">
         <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <span>
-          Delivery isn&apos;t built yet, so nothing is sent today. Your choices
-          are saved and will apply as soon as notifications ship.
+          These arrive in the bell in the top bar. Email delivery isn&apos;t
+          built yet, and the categories marked below aren&apos;t sent at all
+          — those choices are saved for when they are.
         </span>
       </div>
 
@@ -68,8 +70,14 @@ export default function NotificationSettings({
             className="flex items-start justify-between gap-6 py-4 first:pt-0 last:pb-0"
           >
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
                 {NOTIFICATION_COPY[key].title}
+
+                {!LIVE_NOTIFICATION_PREFERENCES.has(key) && (
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    Not sent yet
+                  </span>
+                )}
               </p>
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 {NOTIFICATION_COPY[key].description}

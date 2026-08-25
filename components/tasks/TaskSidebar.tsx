@@ -5,12 +5,15 @@ import {
   Clock,
   FolderKanban,
   UserRound,
+  UserRoundCog,
+  UserRoundPen,
 } from "lucide-react";
 
 import Card from "@/components/ui/Card";
 import StatusPill from "@/components/common/StatusPill";
 import PriorityBadge from "@/components/common/PriorityBadge";
 import { colorClassesFor } from "@/components/projects/project-colors";
+import AssigneeSelect from "./AssigneeSelect";
 import type { TaskDetailData } from "@/lib/types";
 
 function longDate(iso: string | null): string {
@@ -22,9 +25,29 @@ function longDate(iso: string | null): string {
   });
 }
 
-/** The "at a glance" column: metadata only, no controls. */
-export default function TaskSidebar({ detail }: { detail: TaskDetailData }) {
+interface TaskSidebarProps {
+  detail: TaskDetailData;
+  /** Omitted when the viewer can't edit — the assignee then renders as text. */
+  onAssign?: (userId: string) => Promise<void>;
+}
+
+/** The "at a glance" column. Assignment is the one control that lives here. */
+export default function TaskSidebar({ detail, onAssign }: TaskSidebarProps) {
   const { task } = detail;
+
+  // Names are resolved from the member list rather than read off the server
+  // props. Reassigning updates task.assigneeId immediately, but the names in
+  // `detail` only catch up on the next router.refresh() — so trusting those
+  // would leave the old person's name on screen until the refetch landed.
+  const nameById = new Map(
+    detail.assignableMembers.map((member) => [member.userId, member.name]),
+  );
+
+  const assigneeName = nameById.get(task.assigneeId) ?? detail.assigneeName;
+
+  const assignedByName = task.assignedById
+    ? (nameById.get(task.assignedById) ?? detail.assignedByName)
+    : null;
 
   const overdue =
     task.status !== "completed" &&
@@ -80,10 +103,45 @@ export default function TaskSidebar({ detail }: { detail: TaskDetailData }) {
         <div>
           <dt className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
             <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
-            Assignee
+            Assigned to
+          </dt>
+          <dd className="mt-1.5">
+            <AssigneeSelect
+              value={task.assigneeId}
+              members={detail.assignableMembers}
+              currentName={assigneeName}
+              disabled={!onAssign}
+              onAssign={onAssign ?? (async () => {})}
+            />
+          </dd>
+        </div>
+
+        {/* Null until someone actually hands the task over, which is most of
+            them — a task nobody reassigned was never "assigned by" anyone. */}
+        {assignedByName && (
+          <div>
+            <dt className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <UserRoundCog className="h-3.5 w-3.5" aria-hidden="true" />
+              Assigned by
+            </dt>
+            <dd className="mt-1.5 text-sm font-medium text-slate-900 dark:text-slate-100">
+              {assignedByName}
+              {task.assignedAt && (
+                <span className="ml-1.5 font-normal text-slate-500 dark:text-slate-400">
+                  on {longDate(task.assignedAt)}
+                </span>
+              )}
+            </dd>
+          </div>
+        )}
+
+        <div>
+          <dt className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <UserRoundPen className="h-3.5 w-3.5" aria-hidden="true" />
+            Created by
           </dt>
           <dd className="mt-1.5 text-sm font-medium text-slate-900 dark:text-slate-100">
-            {detail.assigneeName}
+            {detail.creatorName}
           </dd>
         </div>
 

@@ -14,18 +14,39 @@ import type { TaskDTO, TaskPriority, TaskStatus } from "./types";
 
 type RawTask = {
   _id: unknown;
+  /** The creator. Also the fallback assignee — see serializeTask. */
+  userId?: unknown;
   title?: string | null;
   description?: string | null;
   status?: TaskStatus | null;
   priority?: TaskPriority | null;
   /** Absent on tasks created before projects existed. */
   projectId?: unknown;
+  /** Absent on tasks created before assignment existed. */
+  assigneeId?: unknown;
+  assignedById?: unknown;
+  assignedAt?: Date | null;
   startDate?: Date | null;
   dueDate?: Date | null;
   createdAt?: Date | null;
   updatedAt?: Date | null;
   completedAt?: Date | null;
 };
+
+/**
+ * The person a task is for.
+ *
+ * `assigneeId` is null on every task written before assignment existed, and on
+ * anything nobody has explicitly handed over. Both resolve to the creator, which
+ * is exactly what those tasks already meant — so the field can be added without
+ * backfilling a single document.
+ */
+export function effectiveAssigneeId(doc: {
+  userId?: unknown;
+  assigneeId?: unknown;
+}): string {
+  return String(doc.assigneeId ?? doc.userId ?? "");
+}
 
 /** Mongoose documents can't cross the server/client boundary — flatten them. */
 export function serializeTask(doc: RawTask): TaskDTO {
@@ -36,6 +57,9 @@ export function serializeTask(doc: RawTask): TaskDTO {
     status: doc.status ?? "pending",
     priority: doc.priority ?? "medium",
     projectId: doc.projectId ? String(doc.projectId) : null,
+    assigneeId: effectiveAssigneeId(doc),
+    assignedById: doc.assignedById ? String(doc.assignedById) : null,
+    assignedAt: doc.assignedAt ? new Date(doc.assignedAt).toISOString() : null,
     startDate: doc.startDate ? new Date(doc.startDate).toISOString() : null,
     dueDate: doc.dueDate ? new Date(doc.dueDate).toISOString() : null,
     createdAt: (doc.createdAt ?? new Date()).toISOString(),

@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 import { LINK_TITLE_MAX } from "@/lib/types";
 
 const TaskLinkSchema = new mongoose.Schema(
@@ -29,5 +31,4 @@ const TaskLinkSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-export default mongoose.models.TaskLink ||
-  mongoose.model("TaskLink", TaskLinkSchema);
+export default defineModel("TaskLink", TaskLinkSchema);
