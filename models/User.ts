@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 import { BIO_MAX, NAME_MAX } from "@/lib/types";
 
 const UserSchema = new mongoose.Schema(
@@ -16,4 +18,4 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-export default mongoose.models.User || mongoose.model("User", UserSchema);
+export default defineModel("User", UserSchema);

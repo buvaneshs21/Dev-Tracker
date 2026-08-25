@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 import { SUBTASK_TITLE_MAX } from "@/lib/types";
 
 const SubtaskSchema = new mongoose.Schema(
@@ -21,5 +23,4 @@ const SubtaskSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-export default mongoose.models.Subtask ||
-  mongoose.model("Subtask", SubtaskSchema);
+export default defineModel("Subtask", SubtaskSchema);

@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 const TaskSchema = new mongoose.Schema(
   {
     userId: {
@@ -15,6 +17,27 @@ const TaskSchema = new mongoose.Schema(
       ref: "Project",
       default: null,
       index: true,
+    },
+    // Who the task is *for*. Null on every task created before assignment
+    // existed, and on personal tasks nobody has handed anywhere — both read
+    // back as "the creator", so no migration is needed. See serializeTask.
+    assigneeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
+    // Who handed it over, and when. Null until someone actually assigns the
+    // task — a task nobody has reassigned was never "assigned by" anyone, and
+    // claiming the creator did it would be inventing history.
+    assignedById: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    assignedAt: {
+      type: Date,
+      default: null,
     },
     title: String,
     description: String,
@@ -51,4 +74,4 @@ const TaskSchema = new mongoose.Schema(
   },
 );
 
-export default mongoose.models.Task || mongoose.model("Task", TaskSchema);
+export default defineModel("Task", TaskSchema);

@@ -102,6 +102,7 @@ export default function ProjectDetail({
           projectId={project.id}
           initialTasks={tasks}
           unassignedTasks={unassignedTasks}
+          members={members}
           readOnly={!canCreateTask}
         />
       )}

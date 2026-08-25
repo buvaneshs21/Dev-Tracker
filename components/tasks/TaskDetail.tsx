@@ -18,6 +18,7 @@ import Modal from "@/components/ui/Modal";
 import StatusPill from "@/components/common/StatusPill";
 import PriorityBadge from "@/components/common/PriorityBadge";
 import { colorClassesFor } from "@/components/projects/project-colors";
+import { useLiveTask } from "@/components/realtime/useLiveTask";
 import TaskForm, { type TaskFormValues } from "./TaskForm";
 import TaskSidebar from "./TaskSidebar";
 import SubtaskList from "./SubtaskList";
@@ -52,7 +53,10 @@ export default function TaskDetail({
 }: TaskDetailProps) {
   const router = useRouter();
 
-  const [task, setTask] = useState(detail.task);
+  // Live: patched by socket events, or polled when realtime is unavailable.
+  // Local mutations below still setTask directly — incoming events merge
+  // idempotently, so the actor's own change coming back is a no-op.
+  const { task, setTask, gone } = useLiveTask(detail.task);
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState<TaskFormValues>(() =>
     toFormValues(detail.task),
@@ -62,7 +66,9 @@ export default function TaskDetail({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const readOnly = !detail.canEdit;
+  // A task that's been deleted (or that you've just lost access to) can't be
+  // edited any more, whatever the role said when the page loaded.
+  const readOnly = !detail.canEdit || gone;
   const done = task.status === "completed";
   const overdue =
     !done && Boolean(task.dueDate) && new Date(task.dueDate!) < new Date();
@@ -166,6 +172,25 @@ export default function TaskDetail({
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* The page is left on screen rather than yanked away — you may be
+          mid-read, and a sudden redirect loses that. Editing is off, so
+          nothing here can be saved against a task that no longer exists. */}
+      {gone && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            This task is no longer available — it was deleted, or your access to
+            it was removed.{" "}
+            <Link href="/tasks" className="font-medium underline">
+              Back to tasks
+            </Link>
+          </span>
         </div>
       )}
 
@@ -320,7 +345,18 @@ export default function TaskDetail({
           />
         </div>
 
-        <TaskSidebar detail={{ ...detail, task }} />
+        <TaskSidebar
+          detail={{ ...detail, task }}
+          // Withheld entirely when read-only, so the sidebar renders a name
+          // rather than a control nobody can use.
+          onAssign={
+            readOnly
+              ? undefined
+              : async (assigneeId) => {
+                  await patch({ assigneeId });
+                }
+          }
+        />
       </div>
 
       {confirming && (

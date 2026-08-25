@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 import { ATTACHMENT_CATEGORIES } from "@/lib/attachment-config";
 
 const AttachmentSchema = new mongoose.Schema(
@@ -36,5 +38,4 @@ const AttachmentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-export default mongoose.models.Attachment ||
-  mongoose.model("Attachment", AttachmentSchema);
+export default defineModel("Attachment", AttachmentSchema);

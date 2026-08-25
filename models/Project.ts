@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { defineModel } from "@/lib/model";
+
 import { PROJECT_COLORS, PROJECT_NAME_MAX, PROJECT_STATUSES } from "@/lib/types";
 
 const ProjectSchema = new mongoose.Schema(
@@ -49,5 +51,4 @@ const ProjectSchema = new mongoose.Schema(
   },
 );
 
-export default mongoose.models.Project ||
-  mongoose.model("Project", ProjectSchema);
+export default defineModel("Project", ProjectSchema);

@@ -3,14 +3,23 @@ import NavSearch from "./NavSearch";
 import NotificationsMenu from "./NotificationsMenu";
 import ProfileMenu from "./ProfileMenu";
 import ThemeToggle from "./ThemeToggle";
+import ConnectionStatus from "@/components/realtime/ConnectionStatus";
+import type { NotificationFeed } from "@/lib/types";
 
 interface NavbarProps {
   title: string;
   user: { name: string; email: string };
   defaultQuery?: string;
+  /** Rendered server-side so the bell's badge is right in the first paint. */
+  notifications: NotificationFeed;
 }
 
-export default function Navbar({ title, user, defaultQuery }: NavbarProps) {
+export default function Navbar({
+  title,
+  user,
+  defaultQuery,
+  notifications,
+}: NavbarProps) {
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
       <div className="flex h-16 items-center gap-4 px-6 lg:px-8">
@@ -25,7 +34,8 @@ export default function Navbar({ title, user, defaultQuery }: NavbarProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <NotificationsMenu />
+          <ConnectionStatus />
+          <NotificationsMenu initial={notifications} />
           <ThemeToggle />
           <div className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
           <ProfileMenu user={user} />
