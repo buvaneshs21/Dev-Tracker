@@ -2,13 +2,16 @@ import { redirect } from "next/navigation";
 
 import AppLayout from "@/components/layout/AppLayout";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import StatsGrid from "@/components/dashboard/StatsGrid";
+import {
+  DashboardRealtime,
+  LiveStats,
+  LiveUpcoming,
+} from "@/components/dashboard/DashboardLive";
 import ProductivityChart from "@/components/dashboard/ProductivityChart";
 import TodayTasks from "@/components/dashboard/TodayTasks";
 import WeeklyGoal from "@/components/dashboard/WeeklyGoal";
 import RecentActivity from "@/components/dashboard/RecentActivity";
 import ActiveProjects from "@/components/dashboard/ActiveProjects";
-import UpcomingTasks from "@/components/calendar/UpcomingTasks";
 import AnalyticsSummary from "@/components/dashboard/AnalyticsSummary";
 import QuickActions from "@/components/dashboard/QuickActions";
 
@@ -16,8 +19,8 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { getSession } from "@/lib/session";
 import { getDashboardData } from "@/lib/tasks";
+import { getDashboardSummary } from "@/lib/dashboard";
 import { getProjects } from "@/lib/projects";
-import { getOverdueTasks, getUpcomingTasks } from "@/lib/calendar";
 import { getAnalyticsSummary } from "@/lib/analytics";
 import { getCollaboratorCount } from "@/lib/members";
 
@@ -34,30 +37,33 @@ export default async function DashboardPage() {
 
   await connectDB();
 
-  const [account, data, projects, upcoming, overdue, summary, collaborators] =
+  // live: the slice a task event invalidates, and the seed for the client.
+  const [account, data, live, projects, summary, collaborators] =
     await Promise.all([
-    User.findById(session.userId).select("name email").lean<Account>(),
-    getDashboardData(session.userId),
-    getProjects(session.userId, { status: "active" }),
-    getUpcomingTasks(session.userId, 4),
-    getOverdueTasks(session.userId, 3),
-    getAnalyticsSummary(session.userId),
-    getCollaboratorCount(session.userId),
-  ]);
+      User.findById(session.userId).select("name email").lean<Account>(),
+      getDashboardData(session.userId),
+      getDashboardSummary(session.userId),
+      getProjects(session.userId, { status: "active" }),
+      getAnalyticsSummary(session.userId),
+      getCollaboratorCount(session.userId),
+    ]);
 
   const name = account?.name || "there";
-  const open = data.counts.pending + data.counts.inProgress;
+  const open = live.counts.pending + live.counts.inProgress;
 
   return (
     <AppLayout title="Dashboard" user={{ name, email: account?.email ?? "" }}>
-      <div className="space-y-8">
-        <DashboardHeader name={name} total={data.counts.total} open={open} />
+      {/* Everything inside stays server-rendered — a client component can
+          receive server-rendered children without pulling them into the
+          bundle. Only LiveStats and LiveUpcoming read the subscription. */}
+      <DashboardRealtime initial={live}>
+        <div className="space-y-8">
+          <DashboardHeader name={name} total={live.counts.total} open={open} />
 
-        <StatsGrid
-          counts={data.counts}
-          totalDelta={data.totalDelta}
-          completedDelta={data.completedDelta}
-        />
+          <LiveStats
+            totalDelta={data.totalDelta}
+            completedDelta={data.completedDelta}
+          />
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
@@ -66,11 +72,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="space-y-6">
-            <UpcomingTasks
-              tasks={upcoming}
-              overdue={overdue}
-              showCalendarLink
-            />
+            <LiveUpcoming />
             <ActiveProjects
               projects={projects.slice(0, 3)}
               activeCount={projects.length}
@@ -94,8 +96,9 @@ export default async function DashboardPage() {
             completed={summary.completed}
             completionRate={summary.completionRate}
           />
+          </div>
         </div>
-      </div>
+      </DashboardRealtime>
     </AppLayout>
   );
 }

@@ -116,11 +116,13 @@ export async function POST(req: Request) {
 
   const created = serializeTask(task.toObject());
 
-  // Emitted only after the write succeeded, and only for tasks that belong to
-  // a project — a personal task has no room to broadcast to.
-  if (created.projectId) {
-    emitTaskEvent({ type: "TASK_CREATED", task: toRealtimeTask(created) });
-  }
+  // Emitted only after the write succeeded. The assignee is listed as a
+  // recipient so it reaches their dashboard even when the task has no project
+  // — and therefore no project room.
+  emitTaskEvent(
+    { type: "TASK_CREATED", task: toRealtimeTask(created) },
+    [created.assigneeId],
+  );
 
   // Awaited rather than dropped: a serverless function can be frozen as soon as
   // it responds. notify() no-ops when you assigned it to yourself.

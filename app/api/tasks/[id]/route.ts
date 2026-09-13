@@ -206,6 +206,12 @@ export async function PATCH(req: Request, { params }: Context) {
     ? String(access.task.projectId)
     : null;
 
+  // Both sides of a handover need telling: the task joins one dashboard as it
+  // leaves the other. Deduped inside emitTaskEvent when they are the same
+  // person.
+  const priorAssignee = effectiveAssigneeId(access.task);
+  const audience = [updated.assigneeId, priorAssignee];
+
   if (previousProjectId && previousProjectId !== updated.projectId) {
     emitTaskEvent({
       type: "TASK_DELETED",
@@ -214,20 +220,21 @@ export async function PATCH(req: Request, { params }: Context) {
     });
   }
 
-  if (updated.projectId) {
-    emitTaskEvent({ type: "TASK_UPDATED", task: toRealtimeTask(updated) });
+  emitTaskEvent({ type: "TASK_UPDATED", task: toRealtimeTask(updated) }, audience);
 
-    // A status change also gets its own narrower event, so a board can move a
-    // card without diffing the whole task.
-    if ("status" in update && access.task.status !== updated.status) {
-      emitTaskEvent({
+  // A status change also gets its own narrower event, so a board can move a
+  // card without diffing the whole task.
+  if ("status" in update && access.task.status !== updated.status) {
+    emitTaskEvent(
+      {
         type: "TASK_STATUS_CHANGED",
         taskId: updated.id,
-        projectId: updated.projectId,
+        projectId: updated.projectId ?? "",
         status: updated.status,
         updatedAt: updated.updatedAt,
-      });
-    }
+      },
+      audience,
+    );
   }
 
   // --- notifications -------------------------------------------------------
@@ -316,12 +323,15 @@ export async function DELETE(_req: Request, { params }: Context) {
   const projectId = access.task.projectId
     ? String(access.task.projectId)
     : null;
+  const deletedAssignee = effectiveAssigneeId(access.task);
 
   await Task.deleteOne({ _id: id });
 
-  if (projectId) {
-    emitTaskEvent({ type: "TASK_DELETED", taskId: id, projectId });
-  }
+  // Captured before the delete, so the person it belonged to still hears it.
+  emitTaskEvent(
+    { type: "TASK_DELETED", taskId: id, projectId: projectId ?? "" },
+    [deletedAssignee],
+  );
 
   return Response.json({ ok: true });
 }

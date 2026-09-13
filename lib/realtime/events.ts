@@ -87,8 +87,22 @@ export type TaskRealtimeEvent =
   | TaskDeletedEvent
   | TaskStatusChangedEvent;
 
-/** The single Socket.IO channel every task event travels on. */
+/** The channel task events travel on inside a project room. */
 export const TASK_EVENT_CHANNEL = "task:event";
+
+/**
+ * The same task events, delivered to the people they belong to.
+ *
+ * The dashboard is user-scoped and the task rooms are project-scoped, so a
+ * project room can't serve it: it would carry every member's work, and it
+ * would carry nothing at all for a personal task, which has no project and so
+ * no room.
+ *
+ * A separate channel rather than reusing TASK_EVENT_CHANNEL in the user room,
+ * so a component listening for one never has to reason about the other
+ * arriving by a second route.
+ */
+export const PERSONAL_TASK_CHANNEL = "task:mine";
 
 export const REALTIME_EVENTS = [
   "TASK_CREATED",
@@ -137,4 +151,19 @@ export type SocketTokenClaims = {
 /** Short enough that revoked access expires quickly, long enough to be cheap. */
 export const SOCKET_TOKEN_TTL_SECONDS = 15 * 60;
 
-export type ConnectionState = "connected" | "connecting" | "offline";
+/**
+ * What the socket is actually doing.
+ *
+ * `connecting` and `reconnecting` are separate because they mean different
+ * things to a reader: the first is a page that has just loaded, the second is
+ * a connection that was working and dropped. Collapsing them made a first page
+ * load announce "Reconnecting…" before it had ever connected to anything.
+ *
+ * `offline` means no live connection — the app is on its polling fallback and
+ * still working, which is why the indicator does not treat it as an error.
+ */
+export type ConnectionState =
+  | "connected"
+  | "connecting"
+  | "reconnecting"
+  | "offline";

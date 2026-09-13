@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 import Task from "@/models/Task";
 import Project from "@/models/Project";
+import { myTasksFilter } from "./tasks";
+import { getAccessibleProjectIds } from "./permissions";
 import {
   addDays,
   addMonths,
@@ -116,10 +118,10 @@ type CompositionRow = {
  * the collection twice for the same documents.
  */
 async function getComposition(
-  owner: mongoose.Types.ObjectId,
+  mine: Record<string, unknown>,
   window: Window,
 ): Promise<CompositionRow> {
-  const match: Record<string, unknown> = { userId: owner };
+  const match: Record<string, unknown> = { ...mine };
   if (window.start) {
     match.createdAt = { $gte: window.start, $lte: window.end };
   }
@@ -333,10 +335,16 @@ export async function getAnalytics(
   userId: string,
   range: AnalyticsRange,
 ): Promise<AnalyticsData> {
-  const owner = new mongoose.Types.ObjectId(userId);
   const window = resolveWindow(range);
 
-  const projectMatch: Record<string, unknown> = { userId: owner };
+  // Analytics asks the same "is this mine?" question as the dashboard, so it
+  // uses the same answer. It previously matched the creator, which meant work
+  // assigned to you inside someone else's project was missing from your own
+  // statistics while appearing in your task list.
+  const mine = await myTasksFilter(userId);
+  const accessible = await getAccessibleProjectIds(userId);
+
+  const projectMatch: Record<string, unknown> = { ...mine };
   if (window.start) {
     projectMatch.createdAt = { $gte: window.start, $lte: window.end };
   }
@@ -351,10 +359,10 @@ export async function getAnalytics(
     overdueRows,
     anyTaskCount,
   ] = await Promise.all([
-    getComposition(owner, window),
+    getComposition(mine, window),
 
     Task.find({
-      userId: owner,
+      ...mine,
       completedAt: { $gte: window.chartStart, $lte: window.end },
     })
       .select("completedAt")
@@ -362,7 +370,7 @@ export async function getAnalytics(
 
     window.previousStart && window.previousEnd
       ? Task.countDocuments({
-          userId: owner,
+          ...mine,
           completedAt: { $gte: window.previousStart, $lte: window.previousEnd },
         })
       : Promise.resolve(0),
@@ -380,13 +388,15 @@ export async function getAnalytics(
       },
     ]),
 
-    // Fetched in full so projects with no tasks still appear at 0%.
-    Project.find({ ownerId: owner })
+    // Fetched in full so projects with no tasks still appear at 0%. Scoped to
+    // every project the user can reach, matching the task scope above — owned
+    // projects alone would leave a joined project's rows unnamed.
+    Project.find({ _id: { $in: accessible } })
       .select("name color")
       .lean<{ _id: unknown; name?: string; color?: ProjectColor }[]>(),
 
     Task.countDocuments({
-      userId: owner,
+      ...mine,
       status: { $ne: "completed" },
       dueDate: { $ne: null, $lt: new Date() },
     }),
@@ -394,7 +404,7 @@ export async function getAnalytics(
     Task.aggregate<OverdueRow>([
       {
         $match: {
-          userId: owner,
+          ...mine,
           status: "completed",
           dueDate: { $ne: null },
           completedAt: { $ne: null },
@@ -411,7 +421,7 @@ export async function getAnalytics(
       },
     ]),
 
-    Task.countDocuments({ userId: owner }),
+    Task.countDocuments(mine),
   ]);
 
   const overview: AnalyticsOverview = {
@@ -513,7 +523,7 @@ export async function getAnalyticsSummary(userId: string): Promise<{
   completionRate: number;
 }> {
   const composition = await getComposition(
-    new mongoose.Types.ObjectId(userId),
+    await myTasksFilter(userId),
     resolveWindow("all"),
   );
 

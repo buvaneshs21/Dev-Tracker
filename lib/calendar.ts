@@ -10,7 +10,8 @@ import type {
   TaskStatus,
   UpcomingTask,
 } from "./types";
-import { serializeTask } from "./tasks";
+import { myTasksFilter, serializeTask } from "./tasks";
+import { getAccessibleProjectIds } from "./permissions";
 
 type TaskRow = {
   _id: unknown;
@@ -62,13 +63,20 @@ export async function getCalendarEvents(
   rangeEnd: Date,
 ): Promise<CalendarEvent[]> {
   const owner = new mongoose.Types.ObjectId(userId);
+  const mine = await myTasksFilter(userId);
 
   const [tasks, projects] = await Promise.all([
     Task.find({
-      userId: owner,
-      $or: [
-        { dueDate: { $gte: rangeStart, $lte: rangeEnd } },
-        { startDate: { $gte: rangeStart, $lte: rangeEnd } },
+      // `mine` already contains an $or, so the date window goes in $and
+      // rather than a second $or key that would overwrite it.
+      $and: [
+        mine,
+        {
+          $or: [
+            { dueDate: { $gte: rangeStart, $lte: rangeEnd } },
+            { startDate: { $gte: rangeStart, $lte: rangeEnd } },
+          ],
+        },
       ],
     })
       .select("title status priority projectId startDate dueDate")
@@ -172,10 +180,12 @@ async function findTasksByDue(
   sort: 1 | -1,
   limit: number,
 ): Promise<UpcomingTask[]> {
-  const owner = new mongoose.Types.ObjectId(userId);
+  // The same "mine" rule the dashboard uses: the effective assignee, not the
+  // creator. A task handed to you in someone else's project is your work.
+  const mine = await myTasksFilter(userId);
 
   const tasks = await Task.find({
-    userId: owner,
+    ...mine,
     status: { $ne: "completed" },
     dueDate: range,
   })
@@ -193,11 +203,19 @@ async function findTasksByDue(
     ),
   ];
 
-  // Scoped by ownerId as well, so a task can never surface another user's
-  // project name through the calendar.
+  // Scoped to projects the user can actually reach. Ownership alone is too
+  // narrow now that tasks assigned inside someone else's project appear here:
+  // the name would resolve to nothing and the row would render as "no
+  // project". Membership is the right boundary, and it is the same one that
+  // let the task through in the first place.
+  const accessible = await getAccessibleProjectIds(userId);
+  const reachable = new Set(accessible.map(String));
+
+  const visibleIds = projectIds.filter((id) => reachable.has(id));
+
   const projects =
-    projectIds.length > 0
-      ? await Project.find({ _id: { $in: projectIds }, ownerId: owner })
+    visibleIds.length > 0
+      ? await Project.find({ _id: { $in: visibleIds } })
           .select("name color")
           .lean<ProjectRow[]>()
       : [];

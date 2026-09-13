@@ -1,5 +1,6 @@
 import {
   NOTIFICATION_EVENT_CHANNEL,
+  PERSONAL_TASK_CHANNEL,
   TASK_EVENT_CHANNEL,
   projectRoom,
   userRoom,
@@ -44,22 +45,44 @@ function emit(envelope: EmitEnvelope): void {
   });
 }
 
-/** Task change → everyone currently viewing that project. */
-export function emitTaskEvent(event: TaskRealtimeEvent): void {
+/**
+ * Task change → everyone viewing that project, plus the people it belongs to.
+ *
+ * `recipients` is how user-scoped views (the dashboard) hear about a task
+ * without subscribing to whole projects. Pass the effective assignee, and on a
+ * reassignment the previous one too, so the task leaves one dashboard as it
+ * joins another. Defaulting to empty keeps every existing call site behaving
+ * exactly as before.
+ */
+export function emitTaskEvent(
+  event: TaskRealtimeEvent,
+  recipients: string[] = [],
+): void {
   const projectId =
     event.type === "TASK_CREATED" || event.type === "TASK_UPDATED"
       ? event.task.projectId
       : event.projectId;
 
-  // A task with no project has no room to broadcast to. Dropping it is correct,
-  // not an error.
-  if (!projectId) return;
+  // A task with no project has no room to broadcast to. Dropping the project
+  // emit is correct, not an error — but its owner still needs to hear about
+  // it, which is exactly why the personal channel exists.
+  if (projectId) {
+    emit({
+      room: projectRoom(projectId),
+      channel: TASK_EVENT_CHANNEL,
+      payload: event,
+    });
+  }
 
-  emit({
-    room: projectRoom(projectId),
-    channel: TASK_EVENT_CHANNEL,
-    payload: event,
-  });
+  // Deduped: a task assigned to the person who just changed it would
+  // otherwise be delivered to the same room twice.
+  for (const userId of new Set(recipients.filter(Boolean))) {
+    emit({
+      room: userRoom(userId),
+      channel: PERSONAL_TASK_CHANNEL,
+      payload: event,
+    });
+  }
 }
 
 /** Notification → the one person it belongs to, wherever they're logged in. */

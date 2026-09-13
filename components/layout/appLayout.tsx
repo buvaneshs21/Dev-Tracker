@@ -49,6 +49,9 @@ export default async function AppLayout({
             user={user}
             defaultQuery={defaultQuery}
             notifications={notifications}
+            // A boolean, never the key. Without one the launcher renders
+            // nothing rather than a button that can only fail.
+            assistantEnabled={Boolean(process.env.GEMINI_API_KEY)}
           />
 
           <main className="flex-1 px-6 py-8 lg:px-8">

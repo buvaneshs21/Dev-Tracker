@@ -52,7 +52,11 @@ export default async function RootLayout({
         {/* Must run before paint, so it can't be a component. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="antialiased">
+      {/* Browser extensions inject attributes here before React hydrates —
+          ColorZilla's cz-shortcut-listen, password managers, and so on. The
+          guard on <html> only covers one level, so <body> needs its own or
+          every user with an extension sees a hydration mismatch we can't fix. */}
+      <body className="antialiased" suppressHydrationWarning>
         <SystemThemeSync />
         {children}
       </body>

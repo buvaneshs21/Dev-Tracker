@@ -3,16 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev-all.mjs",
+    "dev:app": "next dev",
+    "realtime": "node --env-file=.env.local realtime/server.mts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:check": "node --env-file=.env.local scripts/check-db.mjs",
-    "realtime": "node --env-file=.env.local realtime/server.mts"
+    "db:check": "node --env-file=.env.local scripts/check-db.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1107.0",
     "@aws-sdk/s3-request-presigner": "^3.1107.0",
+    "@google/genai": "^2.18.0",
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.28.0",

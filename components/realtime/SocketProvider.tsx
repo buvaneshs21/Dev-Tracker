@@ -79,14 +79,33 @@ export default function SocketProvider({ children }: { children: ReactNode }) {
         reconnectionDelayMax: 10_000,
       });
 
-      instance.on("connect", () => setState("connected"));
-      instance.on("disconnect", () => setState("connecting"));
-      instance.io.on("reconnect_attempt", () => setState("connecting"));
+      // Whether a connection has ever succeeded. It is what separates "still
+      // connecting" from "reconnecting", and it can't be derived from the
+      // socket — socket.io reports a retry the same way either side of a
+      // first success.
+      let everConnected = false;
+
+      instance.on("connect", () => {
+        everConnected = true;
+        setState("connected");
+      });
+
+      instance.on("disconnect", () => {
+        // A live connection dropped. socket.io retries on its own, so this is
+        // reconnecting rather than offline.
+        setState("reconnecting");
+      });
+
+      instance.io.on("reconnect_attempt", () => {
+        setState(everConnected ? "reconnecting" : "connecting");
+      });
 
       instance.on("connect_error", () => {
-        // Auth failures and an unreachable server look the same to the user:
-        // realtime is unavailable, so poll.
-        setState("offline");
+        // Auth failures and an unreachable relay look the same from here.
+        // After a working connection, socket.io keeps retrying, so stay in
+        // "reconnecting"; on a first attempt the relay simply isn't there and
+        // the honest answer is offline — the app is on its polling fallback.
+        setState(everConnected ? "reconnecting" : "offline");
       });
 
       setSocket(instance);

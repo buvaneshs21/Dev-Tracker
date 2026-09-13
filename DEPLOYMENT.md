@@ -51,6 +51,7 @@ Set these in Vercel → Project → Settings → Environment Variables.
 | `S3_SECRET_ACCESS_KEY` | yes (S3) | |
 | `S3_ENDPOINT` | R2/MinIO only | e.g. `https://<account>.r2.cloudflarestorage.com` |
 | `S3_FORCE_PATH_STYLE` | R2/MinIO only | `true` |
+| `GEMINI_API_KEY` | no | Enables the assistant — see §4c |
 
 **Never prefix any of these with `NEXT_PUBLIC_`.** That would ship the
 credentials to the browser.
@@ -75,6 +76,11 @@ On the realtime host, run `node --env-file=.env realtime/server.mts` with:
 | `REALTIME_PORT` | often set by the platform |
 | `REALTIME_ALLOWED_ORIGIN` | your Vercel URL, e.g. `https://devtrack.vercel.app` |
 
+**Locally, `npm run dev` starts both processes.** The relay is optional: if it
+fails to start, the app keeps running on its polling fallback and the runner
+says so loudly rather than leaving you to infer it from a small "Syncing"
+indicator. `npm run dev:app` runs the app alone.
+
 Then on Vercel:
 
 | Variable | Notes |
@@ -92,6 +98,50 @@ live update never requires redeploying the always-on process.
 
 Two kinds of room are in use: `project:{id}`, gated by that token's list, and
 `user:{id}`, joined automatically on connect and used for notifications.
+
+## 4c. The assistant (optional)
+
+The bar's sparkle icon opens a chat that answers questions about your projects
+and tasks, and can create, update and reassign tasks with your confirmation.
+
+It runs on **Google Gemini's free tier**. Without a key the button doesn't
+render at all and nothing else changes.
+
+| Variable | Notes |
+|---|---|
+| `GEMINI_API_KEY` | From [aistudio.google.com/apikey](https://aistudio.google.com/apikey). **Never** prefix with `NEXT_PUBLIC_` |
+| `GEMINI_MODEL` | Optional. Defaults to `gemini-3.5-flash` |
+
+**Free-tier daily quotas vary sharply by model, and the newest are the
+tightest.** `gemini-3.6-flash` allows 20 requests a day; one question costs two
+to four of them (the agentic loop makes a request per step), so that is roughly
+five questions before the assistant stops until midnight Pacific. The default
+is `gemini-3.5-flash` for that reason. The app distinguishes per-minute from
+per-day exhaustion and names the quota, so you are told which wait applies.
+
+Note that free-tier prompts may be used by Google to improve their models; a
+paid key removes both that and the quota ceiling.
+
+Two limits are in the code rather than in config: a single exchange is capped
+at 8 model calls (`MAX_STEPS` in `lib/assistant/chat.ts`), and a conversation
+at 60 turns.
+
+**If the model id is ever retired**, the assistant passes Google's own error
+through — which names the replacement model — and tells you to set
+`GEMINI_MODEL`. No code change needed.
+
+Don't trust `models.list()` as a guide to what a key may call: it still
+advertises `gemini-2.5-flash`, which answers every request with "no longer
+available to new users". The list is a catalogue, not an entitlement.
+
+The assistant reads and writes **only** through the same permission layer as
+the rest of the app, using the session user's id. No tool accepts a user id, so
+there is no way to phrase a question that reaches someone else's data. It has
+no delete tool.
+
+**Swapping model vendor** means rewriting `lib/assistant/chat.ts` and nothing
+else — the tools, permission checks, confirmation protocol and UI are all
+provider-neutral.
 
 ## 5. Deploy
 

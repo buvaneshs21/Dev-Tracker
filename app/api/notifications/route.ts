@@ -1,4 +1,5 @@
 import { connectDB } from "@/lib/mongodb";
+import { DATABASE_UNREACHABLE, isDatabaseUnreachable } from "@/lib/db-error";
 import { getSession } from "@/lib/session";
 import { getNotificationFeed, markRead } from "@/lib/notifications";
 
@@ -24,6 +25,13 @@ export async function GET() {
     });
   } catch (err) {
     console.error("[api/notifications] GET", err);
+
+    // The bell polls in the background on every page, so this is usually the
+    // first route to notice the database has gone away.
+    if (isDatabaseUnreachable(err)) {
+      return Response.json({ error: DATABASE_UNREACHABLE }, { status: 503 });
+    }
+
     return Response.json({ error: "Something went wrong" }, { status: 500 });
   }
 }

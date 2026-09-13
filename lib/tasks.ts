@@ -121,6 +121,47 @@ export async function resolveTaskAccess(
   };
 }
 
+/**
+ * The filter for "tasks that are mine", used by the dashboard, the calendar
+ * and analytics.
+ *
+ * Personal views ask a different question from project views. A project view
+ * shows everything in the project; a personal view shows *your work*. Before
+ * assignment existed those were the same thing, so all three used
+ * `{ userId }` — the creator. They no longer are: a task handed to you in
+ * someone else's project is your work and was invisible, while one you created
+ * and handed away was still counted as yours.
+ *
+ * The rule is the effective assignee — the same one `effectiveAssigneeId`
+ * applies — with an access guard on the third clause:
+ *
+ *  1. You created it and it has no assignee (every pre-assignment task).
+ *  2. You created it and it is assigned to you.
+ *  3. It is assigned to you in a project you can still reach.
+ *
+ * The membership check on (3) matters: being assigned a task and then removed
+ * from its project would otherwise leave it counted on a dashboard you can no
+ * longer open it from.
+ */
+export async function myTasksFilter(
+  userId: string,
+): Promise<Record<string, unknown>> {
+  const me = new mongoose.Types.ObjectId(userId);
+
+  // Imported lazily to match resolveTaskAccess and keep this module free of a
+  // static dependency on the permission layer.
+  const { getAccessibleProjectIds } = await import("./permissions");
+  const accessible = await getAccessibleProjectIds(userId);
+
+  return {
+    $or: [
+      { userId: me, assigneeId: null },
+      { userId: me, assigneeId: me },
+      { assigneeId: me, projectId: { $in: accessible } },
+    ],
+  };
+}
+
 /** Neutralises regex metacharacters so a search for "c++" isn't a syntax error. */
 export function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -256,8 +297,10 @@ type GoalRow = { target: number; done: number };
  * rather than issuing a query per chart tab.
  */
 export async function getDashboardData(userId: string): Promise<DashboardData> {
-  const owner = new mongoose.Types.ObjectId(userId);
   const now = new Date();
+
+  // "Mine" means the effective assignee, not the creator — see myTasksFilter.
+  const mine = await myTasksFilter(userId);
 
   const weekStart = startOfWeek(now);
   const weekEnd = addDays(weekStart, 7);
@@ -275,24 +318,24 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     recentRows,
   ] = await Promise.all([
     Task.aggregate<StatusCountRow>([
-      { $match: { userId: owner } },
+      { $match: mine },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
 
-    Task.countDocuments({ userId: owner, createdAt: { $gte: last7 } }),
+    Task.countDocuments({ ...mine, createdAt: { $gte: last7 } }),
     Task.countDocuments({
-      userId: owner,
+      ...mine,
       createdAt: { $gte: prev7, $lt: last7 },
     }),
 
-    Task.find({ userId: owner, completedAt: { $gte: historyStart } })
+    Task.find({ ...mine, completedAt: { $gte: historyStart } })
       .select("completedAt")
       .lean<{ completedAt: Date }[]>(),
 
     Task.aggregate<GoalRow>([
       {
         $match: {
-          userId: owner,
+          ...mine,
           dueDate: { $gte: weekStart, $lt: weekEnd },
         },
       },
@@ -310,7 +353,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     // Soonest deadline first, undated last — a plain sort on dueDate would put
     // the undated tasks at the top.
     Task.aggregate<RawTask>([
-      { $match: { userId: owner, status: { $ne: "completed" } } },
+      { $match: { ...mine, status: { $ne: "completed" } } },
       {
         $addFields: {
           dueSort: { $ifNull: ["$dueDate", new Date(8640000000000000)] },
@@ -320,7 +363,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
       { $limit: 5 },
     ]),
 
-    Task.find({ userId: owner })
+    Task.find(mine)
       .sort({ updatedAt: -1 })
       .limit(6)
       .lean<RawTask[]>(),
